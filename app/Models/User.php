@@ -9,6 +9,7 @@ use App\Domain\Productores\Models\Productor;
 use App\Domain\Reclamos\Models\Reclamo;
 use App\Domain\Resenas\Models\Resena;
 use App\Domain\Servicios\Models\Servicio;
+use App\Notifications\ResetPasswordNotification;
 // Illuminate\Foundation\Auth\User genera automáticamente el getAuthPassword(),
 // remember_token, etc. requeridos por el guard de sesión/Sanctum.
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -75,6 +76,11 @@ class User extends Authenticatable
     public function esAdmin(): bool
     {
         return $this->rol === 'admin';
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 
     public function servicios(): HasMany

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -90,6 +91,51 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         return new UserResource($request->user());
+    }
+
+    /**
+     * Pide el link de reseteo por email. Responde siempre el mismo mensaje
+     * exista o no la cuenta, para no revelar qué emails están registrados.
+     */
+    public function olvidePassword(Request $request)
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        Password::sendResetLink($request->only('email'));
+
+        return response()->json([
+            'message' => 'Si el email está registrado, te llega un link para restablecer la contraseña.',
+        ]);
+    }
+
+    public function resetearPassword(Request $request)
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8'],
+        ]);
+
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password) {
+                $user->forceFill(['password' => Hash::make($password)])->save();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            $mensajes = [
+                Password::INVALID_TOKEN => 'Este link ya venció o no es válido. Pedí uno nuevo.',
+                Password::INVALID_USER => 'No encontramos una cuenta con ese email.',
+                Password::RESET_THROTTLED => 'Esperá un momento antes de volver a intentar.',
+            ];
+
+            throw ValidationException::withMessages([
+                'email' => $mensajes[$status] ?? 'No pudimos restablecer la contraseña.',
+            ]);
+        }
+
+        return response()->json(['message' => 'Contraseña actualizada. Ya podés ingresar.']);
     }
 
     /**
